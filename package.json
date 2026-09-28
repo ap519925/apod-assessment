@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "npx serve@latest out",
+    "preview": "npm run build && wasmer run . --net",
     "lint": "eslint"
   },
   "dependencies": {

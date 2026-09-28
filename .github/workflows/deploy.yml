@@ -1,0 +1,39 @@
+name: Build and deploy
+
+# The site is a static export, so new APODs only show up after a rebuild.
+# NASA publishes around midnight US Eastern; 06:00 UTC gives it some slack.
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# don't let a push and the nightly run deploy over each other
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          NASA_API_KEY: ${{ secrets.NASA_API_KEY }}
+
+      - uses: wasmerio/setup-wasmer@v3.1
+
+      # needs app.yaml committed (created by the first local `wasmer deploy`)
+      - run: wasmer deploy --non-interactive
+        env:
+          WASMER_TOKEN: ${{ secrets.WASMER_TOKEN }}

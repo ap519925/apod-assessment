@@ -1,0 +1,7 @@
+[general]
+root = "/public"
+port = 80
+# Next writes its 404 page here
+page404 = "/public/404.html"
+directory-listing = false
+compression = true

@@ -82,70 +82,40 @@ src/
 ## Technical Discussion & Architecture Decisions
 
 ### 1. Component Development
-
-#### Server vs. Client Component Boundaries
-In the Next.js App Router, components default to **React Server Components (RSC)**. This architecture keeps data fetching and layout rendering entirely on the server, sending zero runtime JavaScript to the client for the page shell:
-- **Server Components:** `page.tsx`, `page/[page]/page.tsx`, `apod/[date]/page.tsx`, and `Gallery.tsx` are pure Server Components. They fetch data at build time and render semantic, accessible HTML.
-- **Client Components (`"use client"`):** Client boundaries are strictly pushed to the leaf components that require browser APIs or interactive state:
-  - `ApodCard.tsx`: Reads the `useVisited()` hook to highlight viewed cards and render the "Viewed" badge.
-  - `ClearHistoryButton.tsx`: Handles click events and reactively displays the count of viewed items (`Clear history (4)`).
-  - `MarkVisited.tsx`: Implements the **Headless / Renderless Client Component pattern**. Placed on detail pages, it returns `null` and exists solely to trigger a client-side `useEffect` on mount that marks the current date as viewed. This keeps the parent detail page a 100% Server Component rather than forcing the entire route into a heavy client bundle.
-
-#### Component Decomposition & Modularity
-- **`ApodMedia.tsx`:** Isolates polymorphic media rendering. NASA APOD entries can be standard images, YouTube/Vimeo video embeds, or non-embeddable interactive formats. Decoupling this into its own presenter keeps the detail page clean and easy to test.
-- **`Gallery.tsx` & `Pagination.tsx`:** The grid layout, header date summary, and pagination controls are shared between page 1 (`/`) and paginated routes (`/page/[page]`), adhering to DRY principles.
-- **Design System & Typography:** Built with Tailwind CSS v4 using modern `@theme inline` variables. Headings are styled with Google Fonts **Exo 2** for an astronomy/sci-fi aesthetic, while **Geist Sans** is used for readable body copy.
-
----
+- **Server vs. Client Boundaries:** Pages (`page.tsx`, `[page]/page.tsx`, `[date]/page.tsx`) and layout containers (`Gallery.tsx`) are React Server Components (RSC) that render static HTML with zero client JS. Client components (`"use client"`) are pushed strictly to interactive leaves:
+  - `ApodCard.tsx`: Subscribes to `useVisited()` for visual highlighting and "Viewed" badge.
+  - `ClearHistoryButton.tsx`: Handles click events and reactive count display.
+  - `MarkVisited.tsx`: Headless client component (`return null`) that runs a client `useEffect` on mount to record visits without converting the detail page into a client bundle.
+- **Modularity:** `ApodMedia.tsx` isolates polymorphic media rendering (images with high-res links, 16:9 video embeds, and non-embeddable archive fallbacks).
+- **Design System:** Tailwind CSS v4 `@theme inline` with **Exo 2** headings and **Geist Sans** body on a dark space palette.
 
 ### 2. State Management
-
-#### The Problem
-The application requires tracking which APOD entries a user has visited, persisting that state across browser reloads, and synchronizing across multiple open tabs—all while running within a static export where server-side user sessions do not exist.
-
-#### Why `useSyncExternalStore` Over Context / useState / Redux
-Rather than introducing heavy third-party state libraries (Zustand, Redux) or wrapping the entire application in a React Context Provider, the app implements a tiny external store in `src/lib/visited.ts` powered by React 18+'s native `useSyncExternalStore`:
-
-1. **Zero Provider Boilerplate:** No `<VisitedProvider>` is required at the root layout. Any component can consume `useVisited()` directly.
-2. **Selective Re-rendering:** Only components subscribed to `useVisited()` re-render when state changes. Server Components and unaffected cards remain untouched.
-3. **Hydration Safety (No SSR Mismatch):** When prerendering static HTML, `localStorage` does not exist on the server. `useSyncExternalStore` accepts a third argument, `getServerSnapshot: () => EMPTY`. This ensures the server HTML renders a clean baseline (unhighlighted cards) and hydrates on the client without throwing React hydration mismatch warnings.
-4. **Referential Stability (`Object.is`):** `useSyncExternalStore` checks snapshot equality with `Object.is()`. If `read()` called `JSON.parse()` on every render, it would return a new array memory reference each time and cause an infinite re-render loop. `visited.ts` caches the parsed array (`lastRaw` / `lastValue`) so it only re-parses when the raw `localStorage` string actually changes.
-5. **Cross-Tab Synchronization:** Same-tab updates notify active listeners via an internal `Set<() => void>`. To keep separate open browser tabs in sync, the store listens to the window `"storage"` event (`window.addEventListener("storage", ...)`), instantly reflecting changes across all tabs when a user marks or clears history.
-
----
+- **The Problem:** Track and persist visited cards across reloads and open tabs without SSR hydration mismatches in a static export.
+- **Why `useSyncExternalStore` (`src/lib/visited.ts`):**
+  - **Zero Boilerplate:** Avoids wrapping the tree in a `<Context.Provider>`.
+  - **Selective Re-renders:** Only components calling `useVisited()` re-render on updates.
+  - **Hydration Safety:** The 3rd parameter (`getServerSnapshot: () => EMPTY`) renders a clean server baseline matching static HTML, avoiding hydration errors.
+  - **Referential Stability:** Caches the parsed array (`lastRaw` / `lastValue`) so `read()` returns the same reference unless `localStorage` changes, preventing infinite re-render loops from `Object.is()`.
+  - **Multi-Tab Sync:** Automatically syncs across separate tabs via `window.addEventListener("storage", ...)`.
 
 ### 3. API Creation and Consumption
-
-#### API Consumption (`src/lib/apod.ts`)
-The application consumes NASA's Astronomy Picture of the Day API (`https://api.nasa.gov/planetary/apod`):
-- **In-Memory Promise Caching:** Next.js builds routes in parallel across multiple worker processes. By storing the in-flight Promise (`archive ??= fetchArchive()`), all 123 static route workers share a single network call rather than making 100+ redundant HTTP requests that would exhaust NASA API rate limits.
-- **Buffer Lookback for Missing Dates:** NASA APOD occasionally skips dates due to feed outages or service disruptions. To guarantee a full 108-item archive (12 pages of 9), the client requests an extra 14-day lookback buffer (`LOOKBACK_DAYS = 122`) and trims to the exact newest 108 items after sorting descending.
-- **Timezone Normalization:** NASA dates are returned as `YYYY-MM-DD`. Parsing these without an explicit timezone can cause dates to roll back by one day for users in western timezones (e.g. UTC-8). Appending `T00:00:00Z` and formatting with `timeZone: "UTC"` ensures identical, accurate date rendering for all users worldwide.
-- **Video Thumbnail Extraction:** Passing `thumbs: "true"` to the NASA API instructs it to generate thumbnail preview images for video entries (YouTube/Vimeo), ensuring grid cards always have a visual preview.
-
-#### API Creation & Data Contracts
-The data layer is abstracted behind strict TypeScript interfaces:
-- **`Apod` Type:** Strongly types the API response contract (`date`, `title`, `explanation`, `media_type`, `url`, `hdurl`, `thumbnail_url`, `copyright`).
-- **Data Access Helpers:** Pure helper functions (`getPage(page)`, `getApod(date)`, `pageHref(page)`, `previewImage(apod)`) encapsulate data manipulation, decoupling the external API schema from the UI layer. In a full-stack Next.js deployment, this same data layer could back a dedicated Route Handler (`/api/apod`) or Server Action.
-
----
+- **API Consumption (`src/lib/apod.ts`):**
+  - **Promise Caching:** Memoizes `archive ??= fetchArchive()` so all 123 static route workers share a single NASA API call during build.
+  - **Lookback Buffer:** Requests 14 extra buffer days (`LOOKBACK_DAYS = 122`) to guarantee a full 108-item archive despite occasional NASA feed outages.
+  - **Timezone Normalization:** Formats `YYYY-MM-DD` explicitly in UTC (`timeZone: "UTC"`) to prevent western timezones from shifting dates backward by 1 day.
+  - **Video Thumbnails:** Queries with `thumbs: "true"` so YouTube/Vimeo entries have preview images.
+- **Data Contracts:** Abstracted behind strict TypeScript interfaces (`Apod`) and pure helper functions (`getPage()`, `getApod()`, `pageHref()`, `previewImage()`).
 
 ### 4. Rendering Approaches: CSR vs. SSR vs. ISR vs. SSG
-
-| Approach | Rendering Location & Timing | Pros | Cons |
-| :--- | :--- | :--- | :--- |
-| **Client-Side Rendering (CSR)** | Browser renders HTML after downloading JS shell and fetching API client-side | Simplest hosting; dynamic user-specific views | Poor SEO; slower First Contentful Paint (FCP); exposes API keys to client or requires proxy |
-| **Server-Side Rendering (SSR)** | Node.js server generates full HTML on every incoming request | Always fresh data; personalized content per request | High TTFB latency (waits on NASA API every request); server overhead; requires 24/7 Node server |
-| **Incremental Static Regeneration (ISR)** | Prerendered at build time; regenerated in background after timeout (`revalidate`) | Static speed with automated freshness without full rebuilds | Requires running Node.js server runtime (e.g. Vercel or Node/Docker); not portable to static hosts |
-| **Static Site Generation (SSG - Chosen)** | Pre-compiled to static HTML/CSS/JS at build time (`output: "export"`) | Instantaneous TTFB; zero server maintenance; host-agnostic; maximum security | Data freshness requires a rebuild/redeploy |
-
-#### Proof of Approach & Why SSG Was Chosen Over the Others
-This project implements **Static Site Generation (SSG)** via Next.js `output: "export"`. Here is why this was selected over CSR, SSR, and ISR:
-
-1. **Alignment with Content Cadence:** NASA publishes APOD content exactly **once per day**. Using SSR to execute a NASA API request on every page view is inefficient and risks hitting rate limits for data that does not change between requests.
-2. **Infrastructure Independence (Wasmer Edge):** The target platform is **Wasmer Edge** running `static-web-server`. A static export produces pure pre-rendered HTML files (`/index.html`, `/page/2/index.html`, `/apod/2026-09-29/index.html`), making the application completely host-agnostic—it can be served from Wasmer Edge, Cloudflare Pages, S3/CloudFront, or any standard web server without a running Node.js runtime.
-3. **Security & Zero Secrets in Client Bundle:** NASA API keys are only consumed during the build step on the build machine. No API keys or sensitive environment variables are ever included in the client JavaScript bundle.
-4. **Solving the Freshness Trade-off with GitHub Actions:** The traditional drawback of SSG is that new content requires a rebuild. We solved this by pairing the static export with a scheduled GitHub Actions workflow (`.github/workflows/deploy.yml`) configured to run daily at `06:00 UTC`. The workflow automatically fetches today's new APOD, compiles the 123 static pages, and deploys the bundle to Wasmer Edge.
+- **Comparison:**
+  - **CSR:** Fast hosting, but poor SEO, delayed initial paint, and exposes API keys to the browser.
+  - **SSR:** Always fresh, but adds latency to every page view and requires a 24/7 Node server for data that only changes once daily.
+  - **ISR:** Static speed with background revalidation, but requires a Node runtime (cannot run on pure static edge servers).
+  - **SSG (Chosen):** Pre-compiled to static HTML/CSS at build time via `output: "export"`. Instantaneous TTFB, host-agnostic, zero secrets in the client bundle, and zero server maintenance.
+- **Proof of Approach:**
+  - Matches NASA's once-a-day release cadence without redundant server computations.
+  - Runs natively on Wasmer Edge via `static-web-server`.
+  - Solves the static freshness trade-off via a GitHub Actions workflow (`.github/workflows/deploy.yml`) that rebuilds and deploys daily at `06:00 UTC`.
 
 ---
 

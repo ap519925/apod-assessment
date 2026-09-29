@@ -5,19 +5,23 @@ import ApodMedia from "@/components/ApodMedia";
 import MarkVisited from "@/components/MarkVisited";
 import { formatDate, getApod, getArchive, pageHref, PAGE_SIZE } from "@/lib/apod";
 
-// Static export: only the dates returned here get built, anything else 404s.
+// Prerender all dates in our archive window. With dynamicParams = false,
+// any unbuilt date returns an immediate 404.
 export const dynamicParams = false;
 
+// Generates the static params list for every date in the 108-item archive
 export async function generateStaticParams() {
   const apods = await getArchive();
   return apods.map((apod) => ({ date: apod.date }));
 }
 
+// Generates dynamic <title> tag for SEO and browser tab display
 export async function generateMetadata({
   params,
 }: PageProps<"/apod/[date]">): Promise<Metadata> {
-  const apod = await getApod((await params).date);
-  return { title: apod ? `${apod.title} | APOD` : "Not found" };
+  const { date } = await params;
+  const apod = await getApod(date);
+  return { title: apod ? `${apod.title} | APOD Explorer` : "Not found" };
 }
 
 export default async function ApodPage({ params }: PageProps<"/apod/[date]">) {
@@ -27,10 +31,15 @@ export default async function ApodPage({ params }: PageProps<"/apod/[date]">) {
   if (index === -1) notFound();
 
   const apod = apods[index];
-  // list is newest first, so "newer" is the previous index
+
+  // List is sorted newest-first (descending date):
+  // - "newer" picture is at the previous index (index - 1)
+  // - "older" picture is at the next index (index + 1)
   const newer = apods[index - 1];
   const older = apods[index + 1];
-  // send "back" to the grid page this APOD is on, not always the first one
+
+  // Smart back link: sends the user back to the exact grid page this picture belongs to,
+  // rather than always dumping them back on page 1.
   const backHref = pageHref(Math.floor(index / PAGE_SIZE) + 1);
 
   return (

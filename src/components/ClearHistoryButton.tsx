@@ -1,5 +1,9 @@
 "use client";
 
+// Client Component to reset viewed history in localStorage.
+// Reads the current count from useVisited() so the button label updates reactively
+// (e.g. "Clear history (4)") and disables itself when there's nothing to clear.
+
 import { clearVisited, useVisited } from "@/lib/visited";
 
 export default function ClearHistoryButton() {

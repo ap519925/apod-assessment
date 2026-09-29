@@ -1,17 +1,19 @@
 @import "tailwindcss";
 
+/* Tailwind v4 theme tokens */
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-heading: var(--font-exo-2);
 }
 
-/* It's a space site, so it's dark all the time */
+/* Deep space dark background */
 body {
   background: #020617; /* slate-950 */
   color: #e2e8f0; /* slate-200 */
   color-scheme: dark;
 }
 
+/* All heading levels use Exo 2 for a cohesive sci-fi/astronomy aesthetic */
 h1,
 h2,
 h3,

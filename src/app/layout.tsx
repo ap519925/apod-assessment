@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Exo_2 } from "next/font/google";
 import "./globals.css";
 
+// Typography:
+// - Geist Sans for crisp, modern body readability
+// - Exo 2 for headers to give the space/astronomy theme a sleek, sci-fi aesthetic
 const geist = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

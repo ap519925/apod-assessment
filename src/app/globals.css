@@ -2,6 +2,7 @@
 
 @theme inline {
   --font-sans: var(--font-geist-sans);
+  --font-heading: var(--font-exo-2);
 }
 
 /* It's a space site, so it's dark all the time */
@@ -9,4 +10,13 @@ body {
   background: #020617; /* slate-950 */
   color: #e2e8f0; /* slate-200 */
   color-scheme: dark;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-exo-2), sans-serif;
 }

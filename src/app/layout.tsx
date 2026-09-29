@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Exo_2 } from "next/font/google";
 import "./globals.css";
 
 const geist = Geist({
   variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const exo2 = Exo_2({
+  variable: "--font-exo-2",
   subsets: ["latin"],
 });
 
@@ -14,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geist.variable} h-full antialiased`}>
+    <html lang="en" className={`${geist.variable} ${exo2.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         {children}
         <footer className="mt-auto border-t border-slate-800 px-4 py-6 text-center text-xs text-slate-500">

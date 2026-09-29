@@ -1,5 +1,5 @@
-kind: wasmer.io/App.v0
 name: apod-explorer
+app_id: da_KN4IZtyUPoBB
 owner: ap519925
 package: .
-app_id: da_KN4IZtyUPoBB
+kind: wasmer.io/App.v0

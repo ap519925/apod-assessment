@@ -86,4 +86,38 @@ I went with **static generation (SSG) via `output: "export"`**. The data only ch
 
 ## Things I'd add with more time
 
-- Tests for `visited.ts` and the API sorting/trimming
+- Comprehensive test suite for `visited.ts` and API sorting/trimming
+- Keyboard arrow navigation on detail pages
+- Client-side search or filtering by keyword / media type
+
+## Reflection & Retrospective
+
+### What challenges were you trying to solve?
+- **Static Export with Dynamic Visited State:** The app needed to highlight opened cards and persist that history across reloads without causing React SSR hydration mismatches. Because this is a static export, the server HTML cannot know client localStorage state. Using `useSyncExternalStore` with an empty server snapshot cleanly resolved this without layout flashes or console errors.
+- **Heterogeneous Media Types in NASA's Feed:** NASA APOD returns standard images, high-resolution alternatives, YouTube/Vimeo video embeds, and occasional non-standard interactive formats. The UI needed to handle all three gracefully while maintaining a uniform 3x3 grid using fixed aspect ratios and responsive iframes.
+- **Rate Limits & Feed Gaps:** NASA's APOD endpoint occasionally skips days (leaving date gaps) and heavily rate-limits requests on shared keys. To solve this, the build fetches an extra 14-day lookback buffer and memoizes the in-flight fetch promise so that all 123 static route workers share a single API call.
+- **Smart Context-Aware Navigation:** On detail pages, "Back" returns the viewer to the specific paginated grid page containing that picture (e.g. `/page/3`), rather than always defaulting to page 1.
+
+### What, if any, technical limitations were you working within?
+- **Static Export Hosting (Wasmer Edge):** Deploying as a static site via `output: "export"` with `static-web-server` means there is no persistent Node.js server at runtime. Features like dynamic server-side rendering (SSR), on-demand ISR revalidation, and Next.js Image Optimization API (`next/image`) are unavailable.
+- **Fixed Prerender Window:** Because every page must exist as a static HTML file at build time, the archive window is fixed to 108 pictures (12 pages of 9). Daily freshness is automated via GitHub Actions rather than on-demand background regeneration.
+- **Client Storage Availability:** `localStorage` can throw security exceptions in sandboxed iframes or aggressive browser privacy modes (e.g. Safari private browsing), requiring safe exception handling and fallback defaults.
+
+### If you were collaborating with other developers how did you separate the work?
+- **Clear Decoupling by Architectural Layer:**
+  - **Data Layer (`src/lib/apod.ts`):** API integration, TypeScript definitions (`Apod`), pagination math, date formatting, and caching logic.
+  - **Client State Layer (`src/lib/visited.ts`):** `useSyncExternalStore` implementation, localStorage persistence, and cross-tab storage event listeners.
+  - **Component Library (`src/components/`):** Pure presentation components (`Gallery`, `ApodCard`, `ApodMedia`, `Pagination`, `ClearHistoryButton`) built against defined TypeScript interfaces.
+  - **App Router Pages (`src/app/`):** Route-level orchestration, dynamic route segment params, metadata generation, and static parameter export.
+- **TypeScript Interface Contracts:** Establishing the `Apod` type definition early allowed frontend UI development to proceed in parallel with API fetching logic without integration friction.
+- **Feature Branches & Scoped Commits:** Keeping pull requests focused on distinct milestones (scaffolding, data fetching, visited highlighting, automated deployment workflow) makes code reviews straightforward.
+
+### What did you enjoy about the project?
+- **Building a Zero-Dependency Reactive Store:** Implementing a custom external store with React's modern `useSyncExternalStore` was satisfying. It delivered instant cross-tab synchronization and clean hydration with zero provider boilerplate and zero third-party dependencies.
+- **Visual Polish & Space Theme:** Pairing Tailwind v4 with custom Google fonts (Exo 2 for futuristic headings and Geist Sans for readable prose) on a deep-slate canvas gave the site an authentic, immersive space aesthetic.
+- **Speed & Simplicity of Edge Static Hosting:** Serving pure pre-compiled HTML and CSS on Wasmer Edge results in instantaneous page loads and low complexity.
+
+### What would you do differently if you could do it over?
+- **Automated Testing Suite:** Introduce Vitest and React Testing Library from day one to write automated unit tests for `visited.ts` (state caching, multi-tab events) and `apod.ts` (date math and array slicing).
+- **Keyboard Navigation:** Add left/right arrow key listeners on detail pages to quickly flip through consecutive APOD pictures without clicking.
+- **Hybrid SSR / Proxy for Infinite History:** If hosted on a platform supporting a Node.js runtime, switch from `output: "export"` to Incremental Static Regeneration (ISR) with an API proxy, allowing users to page back years into the NASA archive rather than being capped at 108 pictures.

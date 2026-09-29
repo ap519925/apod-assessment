@@ -1,9 +1,6 @@
 "use client";
 
-// Marked as a Client Component because it subscribes to the useVisited() hook
-// to check if this specific card was already opened by the user.
-// The rest of the page (Gallery, headers, pagination) remains a Server Component.
-
+// Client Component solely for reactive visited highlighting via useVisited().
 import Link from "next/link";
 import { type Apod, formatDate, previewImage } from "@/lib/apod";
 import { useVisited } from "@/lib/visited";
@@ -21,13 +18,9 @@ export default function ApodCard({ apod }: { apod: Apod }) {
           : "border-slate-800 bg-slate-900 hover:border-slate-600"
       }`}
     >
-      {/* Fixed 4:3 aspect container so grid cards stay uniform regardless of original image dimensions */}
       <div className="relative aspect-[4/3] bg-slate-800">
         {image ? (
-          // Using standard <img> here because:
-          // 1. Next.js image optimization requires a Node.js server, which doesn't exist in a static export (SSG).
-          // 2. APOD images originate from arbitrary external CDNs, which would require an ever-growing remotePatterns list.
-          // Native loading="lazy" handles offscreen performance cleanly.
+          // Plain <img>: Next image optimization requires a Node server (disabled in static export).
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={image}

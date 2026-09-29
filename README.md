@@ -1,6 +1,6 @@
 # APOD Explorer
 
-A small Next.js + TypeScript + Tailwind app built for the Stanford Web Services take-home. It shows entries from NASA's [Astronomy Picture of the Day](https://apod.nasa.gov/apod/astropix.html) API in a 3x3 grid, newest first, with Newer/Older paging back through the last 108 pictures. Clicking a card opens a detail page, cards you've already opened are highlighted when you go back, and "Clear history" resets them.
+A Next.js + TypeScript + Tailwind CSS app built for the Stanford Web Services take-home, styled with Google Fonts (Exo 2 headings + Geist Sans body) on a space-themed dark palette. It displays entries from NASA's [Astronomy Picture of the Day](https://apod.nasa.gov/apod/astropix.html) API in a responsive 3x3 grid, newest first, with Newer/Older paging back through the last 108 pictures. Clicking a card opens a detail page, cards you've already opened are highlighted when you go back, and "Clear history" resets them.
 
 **Live site:** https://apod-explorer.wasmer.app
 
